@@ -155,49 +155,6 @@ func GET(reqinf *ReqInfo, timeout time.Duration) (*ResInfo, error) {
 		Body:       response,
 	}, nil
 }
-func keyDecrypt(keyStr string, cryptoText string) string {
-	h := sha256.New()
-	h.Write([]byte(keyStr))
-	keyBytes := h.Sum(nil)
-	return decrypt(keyBytes, cryptoText)
-}
-
-// POST API request
-// func POST(reqinf *ReqInfo, timeout time.Duration) (*ResInfo, error) {
-// 	req, err := http.NewRequest("POST", reqinf.URL, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	req.Header.Add("Content-Type", reqinf.HeaderInfo.ContentType)
-// 	req.Header.Add("X-Cons-ID", reqinf.HeaderInfo.XConsID)
-// 	req.Header.Add("X-Signature", reqinf.HeaderInfo.XSignature)
-// 	req.Header.Add("X-Timestamp", reqinf.HeaderInfo.XSignature)
-// 	req.Header.Add("user_key", reqinf.HeaderInfo.XTimestamp)
-
-// 	// execute
-// 	cl := &http.Client{
-// 		Timeout: timeout,
-// 	}
-// 	res, err := cl.Do(req)
-// 	if err != nil {
-// 		fmt.Println("ERROR :", err)
-// 		// return nil, err
-// 	}
-// 	defer res.Body.Close()
-
-// 	// read body
-// 	buf, err := ioutil.ReadAll(res.Body)
-// 	if err != nil {
-// 		fmt.Println("ERROR 2:", err)
-// 		// return nil, err
-// 	}
-
-// 	return &ResInfo{
-// 		StatusCode: res.StatusCode,
-// 		Body:       buf,
-// 	}, nil
-// }
 
 func GenerateHMAC256(k, message string) string {
 	key := []byte(k)
@@ -205,30 +162,7 @@ func GenerateHMAC256(k, message string) string {
 	h.Write([]byte(message))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
-func decrypt(key []byte, cryptoText string) string {
-	ciphertext, err := base64.StdEncoding.DecodeString(cryptoText)
-	if err != nil {
-		panic(err)
-	}
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err)
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		panic("ciphertext too short")
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-	return fmt.Sprintf("%s", ciphertext)
-}
 func AESDecrypt(cryptoText string, key []byte) []byte {
 	crypt, err := base64.StdEncoding.DecodeString(cryptoText)
 	block, err := aes.NewCipher(key)
