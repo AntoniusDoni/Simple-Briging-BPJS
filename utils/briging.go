@@ -83,11 +83,15 @@ type ResDecycptAPI struct {
 type ResInfo struct {
 	StatusCode int
 	Header     http.Header
-	Body       ResDecycptAPI
+	Body       []byte
 }
 type ResposeBodyBriging struct {
 	MetaData Body   `json:"metadata"`
 	Response string `json:"response"`
+}
+type ResponseBriging struct {
+	MetaData Body   `json:"metadata"`
+	Body     []byte `json:"response"`
 }
 
 type Body struct {
@@ -96,7 +100,7 @@ type Body struct {
 }
 
 // GET API request
-func GET(reqinf *ReqInfo, timeout time.Duration) (*ResInfo, error) {
+func GET(reqinf *ReqInfo, timeout time.Duration) (*ResponseBriging, error) {
 
 	req, err := http.NewRequest("GET", reqinf.URL, nil)
 	if err != nil {
@@ -140,20 +144,32 @@ func GET(reqinf *ReqInfo, timeout time.Duration) (*ResInfo, error) {
 	key := fmt.Sprintf("%s%s%d", constid, Secretkey, xTimestamp)
 	var resBody ResposeBodyBriging
 	json.Unmarshal(buf, &resBody)
+	if resBody.MetaData.Code != "200" {
+		return &ResponseBriging{MetaData: resBody.MetaData, Body: nil}, nil
+	}
+
 	shakey := sha256.New()
 	shakey.Write([]byte(key))
 	keys := shakey.Sum(nil)
-	ds := AESDecrypt(resBody.Response, keys)
-	decyptRes, errs := lzstring.DecompressFromEncodedURIComponent(string(ds))
-	var response ResDecycptAPI
-	json.Unmarshal([]byte(decyptRes), &response)
-	if errs != nil {
-		fmt.Println(errs)
+
+	ds, err := AESDecrypt(resBody.Response, keys)
+
+	if err != nil {
+		fmt.Println("ERROR AES DECODE :", err)
+		return nil, err
 	}
-	return &ResInfo{
-		StatusCode: res.StatusCode,
-		Body:       response,
-	}, nil
+	var decyptRes string
+	var errs error
+	var response ResDecycptAPI
+	if len(ds) > 0 {
+		decyptRes, errs = lzstring.DecompressFromEncodedURIComponent(string(ds))
+		json.Unmarshal([]byte(decyptRes), &response)
+		if errs != nil {
+			fmt.Println("ERROR LZSTRING DECODE : ", errs)
+			return nil, err
+		}
+	}
+	return &ResponseBriging{MetaData: resBody.MetaData, Body: []byte(decyptRes)}, nil
 }
 
 func GenerateHMAC256(k, message string) string {
@@ -163,21 +179,24 @@ func GenerateHMAC256(k, message string) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-func AESDecrypt(cryptoText string, key []byte) []byte {
+func AESDecrypt(cryptoText string, key []byte) ([]byte, error) {
 	crypt, err := base64.StdEncoding.DecodeString(cryptoText)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		fmt.Println("key error1", err)
+		return nil, err
+
 	}
 	if len(crypt) == 0 {
 		fmt.Println("plain content empty")
+		return nil, err
 	}
 	vi := key[:aes.BlockSize]
 	ecb := cipher.NewCBCDecrypter(block, vi)
 	decrypted := make([]byte, len(crypt))
 	ecb.CryptBlocks(decrypted, crypt)
 
-	return PKCS5Trimming(decrypted)
+	return PKCS5Trimming(decrypted), nil
 
 }
 
