@@ -137,7 +137,7 @@ func GET(reqinf *ReqInfo, timeout time.Duration) (*ResInfo, error) {
 		fmt.Println("ERROR READ RESPONSE:", err)
 		return nil, err
 	}
-	key := fmt.Sprintf("%s%s%d", "4596", "5sQBCB59C6", xTimestamp)
+	key := fmt.Sprintf("%s%s%d", constid, Secretkey, xTimestamp)
 	var resBody ResposeBodyBriging
 	json.Unmarshal(buf, &resBody)
 	shakey := sha256.New()
